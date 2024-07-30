@@ -1,0 +1,72 @@
+---
+### 전처리 선언
+# 시나리오
+# Preprocess ──▶ Scheduler ──▶  CreateInput ─┬─▶ Odd  ────▶ Print
+#                                            ├─▶ Even ─┐
+#                                            └─────────┴──▶ (에러발생시) Error
+
+Preprocess:
+  type: graph.connect.Preprocess
+  next: [Scheduler]
+
+Scheduler:
+  type: graph.connect.schedule.Scheduler
+  next: [CreateInput] # ,CustomModule
+  property:
+    cron: "* * * * *"
+    #    cron: # 한줄 표현식 "0 0 1 * * *" # 분 시 일 월 년 주, key:value형식의 경우 second, minute, hour, year, month, day, week, dayOfWeek,
+    #      minute: 10
+    #      hour: 10
+    #      day: 2-8
+    #      dayOfWeek: sun # (0-6 or mon,tue,wed,thu,fri,sat,sun)
+    job:
+      type: graph.job.HistoryJob
+      property:
+        name: odd_even
+        jobNames: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" ]
+
+CreateInput:
+  type: graph.connect.simple.Simple
+  next:
+    next:
+      - if: $ref( int(input.name) % 2 == 0)
+        next: [ Even ]
+      - if: $ref( int(input.name) % 2 != 0)
+        next: [ Odd ]
+    onError: [Error] # [Error]
+  property:
+    onError: STOP # SKIP STOP
+  actions:
+    - dummy: ~
+    - raiseError:
+        raiseErrorWhens: [ 10 ]
+
+Odd:
+  type: graph.connect.simple.Simple
+  next: [Print]
+  actions:
+    - dummy:
+        sleep: 1
+
+Even:
+  type: graph.connect.simple.Simple
+  next: [Print]
+  actions:
+    - dummy:
+        sleep: 1
+    - raiseError:
+        raiseErrorWhens: [ 4 ]
+
+
+Print:
+  type: graph.connect.simple.Simple
+  actions:
+    - dummy:
+        sleep: 1
+
+Error:
+  type: graph.connect.simple.Simple
+  actions:
+    - raiseError:
+        name: "Error - custom error"
+        isError: False
